@@ -24,8 +24,11 @@
 /-----------------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f4xx_hal.h"
-#include "bsp_driver_sd.h"
+#include "usbh_core.h"
+#include "usbh_msc.h"
 #include "cmsis_os.h" /* _FS_REENTRANT set to 1 and CMSIS API chosen */
+/* Handle for USB Host */
+#define hUSB_Host hUsbHostFS
 
 /*-----------------------------------------------------------------------------/
 / Function Configurations
@@ -110,7 +113,7 @@
 /   950 - Traditional Chinese (DBCS)
 */
 
-#define _USE_LFN     3    /* 0 to 3 */
+#define _USE_LFN     2    /* 0 to 3 */
 #define _MAX_LFN     255  /* Maximum LFN length to handle (12 to 255) */
 /* The _USE_LFN switches the support of long file name (LFN).
 /
@@ -204,7 +207,7 @@
 / System Configurations
 /----------------------------------------------------------------------------*/
 
-#define _FS_TINY    1      /* 0:Normal or 1:Tiny */
+#define _FS_TINY    0      /* 0:Normal or 1:Tiny */
 /* This option switches tiny buffer configuration. (0:Normal or 1:Tiny)
 /  At the tiny configuration, size of file object (FIL) is reduced _MAX_SS bytes.
 /  Instead of private sector buffer eliminated from the file object, common sector
@@ -243,7 +246,7 @@
 
 #define _USE_MUTEX       0 /* 0:Disable or 1:Enable */
 #define _FS_TIMEOUT      1000 /* Timeout period in unit of time ticks */
-#define _SYNC_t          osSemaphoreId_t
+#define _SYNC_t          osSemaphoreId
 /* The option _FS_REENTRANT switches the re-entrancy (thread safe) of the FatFs
 /  module itself. Note that regardless of this option, file access to different
 /  volume is always re-entrant and volume control functions, f_mount(), f_mkfs()

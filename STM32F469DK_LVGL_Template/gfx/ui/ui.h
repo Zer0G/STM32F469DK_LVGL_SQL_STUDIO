@@ -25,7 +25,6 @@ extern lv_obj_t * ui____initial_actions0;
 
 
 LV_IMG_DECLARE(ui_img_1415182567);    // assets\Curves-2.png
-LV_IMG_DECLARE(ui_img_blackandwhiteabstractwallpaper_png);    // assets\BlackAndWhiteAbstractWallpaper.png
 LV_IMG_DECLARE(ui_img_1712731771);    // assets\blue-background.png
 
 

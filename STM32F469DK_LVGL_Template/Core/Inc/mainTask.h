@@ -8,6 +8,6 @@
 #ifndef INC_MAINTASK_H_
 #define INC_MAINTASK_H_
 
-void MainTask(void *argument);
+void MainTask(void const *argument);
 
 #endif /* INC_MAINTASK_H_ */

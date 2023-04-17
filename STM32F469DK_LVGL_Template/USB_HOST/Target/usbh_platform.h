@@ -1,8 +1,8 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file           : fatfs_platform.c
-  * @brief          : fatfs_platform source file
+  * @file           : usbh_platform.h
+  * @brief          : Header for usbh_platform.c file.
   ******************************************************************************
   * @attention
   *
@@ -14,19 +14,29 @@
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
-*/
+  */
 /* USER CODE END Header */
-#include "fatfs_platform.h"
 
-uint8_t	BSP_PlatformIsDetected(void) {
-    uint8_t status = SD_PRESENT;
-    /* Check SD card detect pin */
-    if(HAL_GPIO_ReadPin(SD_DETECT_GPIO_PORT, SD_DETECT_PIN) != GPIO_PIN_RESET)
-    {
-        status = SD_NOT_PRESENT;
-    }
-    /* USER CODE BEGIN 1 */
-    /* user code can be inserted here */
-    /* USER CODE END 1 */
-    return status;
+/* Define to prevent recursive inclusion -------------------------------------*/
+#ifndef __USBH_PLATFORM_H__
+#define __USBH_PLATFORM_H__
+
+#ifdef __cplusplus
+ extern "C" {
+#endif
+
+/* Includes ------------------------------------------------------------------*/
+#include "usb_host.h"
+
+/* USER CODE BEGIN INCLUDE */
+
+/* USER CODE END INCLUDE */
+
+void MX_DriverVbusFS(uint8_t state);
+
+#ifdef __cplusplus
 }
+#endif
+
+#endif /* __USBH_PLATFORM_H__ */
+

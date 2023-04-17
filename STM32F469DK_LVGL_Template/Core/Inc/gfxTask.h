@@ -8,6 +8,6 @@
 #ifndef INC_GFXTASK_H_
 #define INC_GFXTASK_H_
 
-void GfxTask(void *argument);
+void GfxTask(void const *argument);
 
 #endif /* INC_GFXTASK_H_ */

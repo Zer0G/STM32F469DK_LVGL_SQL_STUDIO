@@ -20,6 +20,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "fatfs.h"
+#include "usb_host.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -31,10 +32,11 @@
 #include <screen_driver.h>
 #include <touch_sensor_driver.h>
 #include "stm32469i_discovery_sdram.h"
-#include "stm32469i_discovery_sd.h"
 #include "mainTask.h"
 #include "gfxTask.h"
 #include "rtTask.h"
+#include "fatfs.h"
+#include "usbh_diskio.h"
 
 /* USER CODE END Includes */
 
@@ -89,36 +91,14 @@ LTDC_HandleTypeDef hltdc;
 
 QSPI_HandleTypeDef hqspi;
 
-SD_HandleTypeDef hsd;
-DMA_HandleTypeDef hdma_sdio_rx;
-DMA_HandleTypeDef hdma_sdio_tx;
-
 UART_HandleTypeDef huart3;
 
 DMA_HandleTypeDef hdma_memtomem_dma2_stream0;
 SDRAM_HandleTypeDef hsdram1;
 
-/* Definitions for mainTask */
-osThreadId_t mainTaskHandle;
-const osThreadAttr_t mainTask_attributes = {
-  .name = "mainTask",
-  .stack_size = 1024 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for gfxTask */
-osThreadId_t gfxTaskHandle;
-const osThreadAttr_t gfxTask_attributes = {
-  .name = "gfxTask",
-  .stack_size = 1024 * 4,
-  .priority = (osPriority_t) osPriorityLow,
-};
-/* Definitions for rtTask */
-osThreadId_t rtTaskHandle;
-const osThreadAttr_t rtTask_attributes = {
-  .name = "rtTask",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityRealtime,
-};
+osThreadId mainTaskHandle;
+osThreadId gfxTaskHandle;
+osThreadId rtTaskHandle;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -135,10 +115,9 @@ static void MX_I2C1_Init(void);
 static void MX_LTDC_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_QUADSPI_Init(void);
-static void MX_SDIO_SD_Init(void);
-void MainTask(void *argument);
-extern void GfxTask(void *argument);
-extern void RTTask(void *argument);
+void MainTask(void const * argument);
+extern void GfxTask(void const * argument);
+extern void RTTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -188,7 +167,6 @@ int main(void)
   MX_LTDC_Init();
   MX_USART3_UART_Init();
   MX_QUADSPI_Init();
-  MX_SDIO_SD_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
@@ -203,16 +181,10 @@ int main(void)
   screen_driver_init();
   touch_sensor_driver_init();
   ui_init();
-  HAL_GPIO_WritePin(LCD_BL_GPIO_Port, LCD_BL_Pin, GPIO_PIN_SET);
-
-
 
 
 
   /* USER CODE END 2 */
-
-  /* Init scheduler */
-  osKernelInitialize();
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -231,22 +203,22 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of mainTask */
-  mainTaskHandle = osThreadNew(MainTask, NULL, &mainTask_attributes);
+  /* definition and creation of mainTask */
+  osThreadDef(mainTask, MainTask, osPriorityNormal, 0, 2048);
+  mainTaskHandle = osThreadCreate(osThread(mainTask), NULL);
 
-  /* creation of gfxTask */
-  gfxTaskHandle = osThreadNew(GfxTask, NULL, &gfxTask_attributes);
+  /* definition and creation of gfxTask */
+  osThreadDef(gfxTask, GfxTask, osPriorityLow, 0, 1024);
+  gfxTaskHandle = osThreadCreate(osThread(gfxTask), NULL);
 
-  /* creation of rtTask */
-  rtTaskHandle = osThreadNew(RTTask, NULL, &rtTask_attributes);
+  /* definition and creation of rtTask */
+  osThreadDef(rtTask, RTTask, osPriorityRealtime, 0, 256);
+  rtTaskHandle = osThreadCreate(osThread(rtTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
 
-  /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
-  /* USER CODE END RTOS_EVENTS */
+  /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
   osKernelStart();
@@ -326,14 +298,12 @@ void PeriphCommonClock_Config(void)
 
   /** Initializes the peripherals clock
   */
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SDIO|RCC_PERIPHCLK_CLK48
-                              |RCC_PERIPHCLK_LTDC;
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_CLK48|RCC_PERIPHCLK_LTDC;
   PeriphClkInitStruct.PLLSAI.PLLSAIN = 384;
   PeriphClkInitStruct.PLLSAI.PLLSAIR = 6;
   PeriphClkInitStruct.PLLSAI.PLLSAIP = RCC_PLLSAIP_DIV8;
   PeriphClkInitStruct.PLLSAIDivR = RCC_PLLSAIDIVR_2;
   PeriphClkInitStruct.Clk48ClockSelection = RCC_CLK48CLKSOURCE_PLLSAIP;
-  PeriphClkInitStruct.SdioClockSelection = RCC_SDIOCLKSOURCE_CLK48;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -612,34 +582,6 @@ static void MX_QUADSPI_Init(void)
 }
 
 /**
-  * @brief SDIO Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SDIO_SD_Init(void)
-{
-
-  /* USER CODE BEGIN SDIO_Init 0 */
-
-  /* USER CODE END SDIO_Init 0 */
-
-  /* USER CODE BEGIN SDIO_Init 1 */
-
-  /* USER CODE END SDIO_Init 1 */
-  hsd.Instance = SDIO;
-  hsd.Init.ClockEdge = SDIO_CLOCK_EDGE_RISING;
-  hsd.Init.ClockBypass = SDIO_CLOCK_BYPASS_DISABLE;
-  hsd.Init.ClockPowerSave = SDIO_CLOCK_POWER_SAVE_DISABLE;
-  hsd.Init.BusWide = SDIO_BUS_WIDE_4B;
-  hsd.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
-  hsd.Init.ClockDiv = 0;
-  /* USER CODE BEGIN SDIO_Init 2 */
-
-  /* USER CODE END SDIO_Init 2 */
-
-}
-
-/**
   * @brief USART3 Initialization Function
   * @param None
   * @retval None
@@ -706,12 +648,6 @@ static void MX_DMA_Init(void)
   /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
-  /* DMA2_Stream3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
-  /* DMA2_Stream6_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream6_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream6_IRQn);
 
 }
 
@@ -831,7 +767,6 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
@@ -839,6 +774,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOK_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOJ_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
@@ -851,13 +787,16 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, OTG_FS1_PowerSwitchOn_Pin|EXT_RESET_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(VBUS_GPIO_Port, VBUS_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOH, GPIO_PIN_7, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LCD_BL_GPIO_Port, LCD_BL_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(EXT_RESET_GPIO_Port, EXT_RESET_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : LED3_Pin LED2_Pin */
   GPIO_InitStruct.Pin = LED3_Pin|LED2_Pin;
@@ -880,8 +819,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : OTG_FS1_PowerSwitchOn_Pin EXT_RESET_Pin */
-  GPIO_InitStruct.Pin = OTG_FS1_PowerSwitchOn_Pin|EXT_RESET_Pin;
+  /*Configure GPIO pins : VBUS_Pin EXT_RESET_Pin */
+  GPIO_InitStruct.Pin = VBUS_Pin|EXT_RESET_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -914,6 +853,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(LCD_BL_GPIO_Port, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
+
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
@@ -934,8 +874,10 @@ int _write(int file, char *ptr, int len)
   * @retval None
   */
 /* USER CODE END Header_MainTask */
-__weak void MainTask(void *argument)
+__weak void MainTask(void const * argument)
 {
+  /* init code for USB_HOST */
+  MX_USB_HOST_Init();
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
   for(;;)

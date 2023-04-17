@@ -4,9 +4,10 @@
  *  Created on: Apr 14, 2023
  *      Author: developer
  */
+#include "cmsis_os.h"
 #include "ui.h"
 
-void GfxTask(void *argument)
+void GfxTask(void const *argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */

@@ -139,8 +139,8 @@ void Error_Handler(void);
 #define D13_GPIO_Port GPIOD
 #define SDNWE_Pin GPIO_PIN_0
 #define SDNWE_GPIO_Port GPIOC
-#define OTG_FS1_PowerSwitchOn_Pin GPIO_PIN_2
-#define OTG_FS1_PowerSwitchOn_GPIO_Port GPIOB
+#define VBUS_Pin GPIO_PIN_2
+#define VBUS_GPIO_Port GPIOB
 #define A6_Pin GPIO_PIN_12
 #define A6_GPIO_Port GPIOF
 #define A11_Pin GPIO_PIN_1
